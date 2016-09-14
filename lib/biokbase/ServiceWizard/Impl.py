@@ -116,6 +116,15 @@ class ServiceWizard:
                 "image" : "rancher/dns-service",
                 "links" : [ service_name+':'+service_name ]
             }
+        devices = []
+        remote_scratch_path = os.path.join(self.REMOTE_SCRATCH_BASE, module_version['module_name'],
+                                           module_version['git_commit_hash'])
+        devices.append(remote_scratch_path + ":/kb/module/work")
+        data_folder = module_version.get('data_folder', None)
+        data_version = module_version.get('data_version', None)
+        if data_folder and data_version:
+            remote_data_path = os.path.join(self.REMOTE_REF_DATA_BASE, data_folder, data_version)
+            devices.append(remote_data_path + ":/data:ro")
         docker_compose[service_name] = {
                 "image" : module_version['docker_img_name'],
                 "labels" : {
@@ -124,7 +133,8 @@ class ServiceWizard:
                 },
                 "environment" : {
                     'KBASE_ENDPOINT' : self.KBASE_ENDPOINT
-                }
+                },
+                "devices": devices
             }
 
         rancher_compose[service_name] = {
@@ -235,6 +245,14 @@ class ServiceWizard:
         else:
             self.RANCHER_ACCESS_KEY = config['access-key']
             self.RANCHER_SECRET_KEY = config['secret-key']
+        
+        if 'remote-scratch-base' not in config:
+            raise ValueError('"remote-scratch-base" configuration variable not set"')
+        self.REMOTE_SCRATCH_BASE = config['remote-scratch-base']
+        
+        if 'remote-ref-data-base' not in config:
+            raise ValueError('"remote-ref-data-base" configuration variable not set"')
+        self.REMOTE_REF_DATA_BASE = config['remote-ref-data-base'] 
 
         #END_CONSTRUCTOR
         pass
@@ -299,9 +317,7 @@ class ServiceWizard:
         # First, lookup the module information from the catalog, make sure it is a service
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
-        if 'dynamic_service' not in mv:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        if mv['dynamic_service'] != 1:
+        if ('dynamic_service' not in mv) or (mv['dynamic_service'] != 1):
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
         # Construct the docker compose and rancher compose file
