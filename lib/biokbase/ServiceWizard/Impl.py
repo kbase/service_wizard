@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #BEGIN_HEADER
 import os
 import time
@@ -39,8 +40,8 @@ class ServiceWizard:
     # the latter method is running.
     #########################################
     VERSION = "0.3.0"
-    GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "7ce70ba16d70429ee6fea6cddd914abea4fb4dec"
+    GIT_URL = "git@github.com:msneddon/service_wizard"
+    GIT_COMMIT_HASH = "944bb62889baf435df6e8d12f5dfa8744c54cbea"
     
     #BEGIN_CLASS_HEADER
 
@@ -685,23 +686,29 @@ class ServiceWizard:
         service = params['service']
         user_id = ctx['user_id']
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+
+        # get_module_info is needed to get us owners list
         module = cc.get_module_info({'module_name' : service['module_name']})
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
         has_access = False
-        for o in module['owners']:
-            if o == user_id:
-                has_access = True
+        if 'dev' in mv['release_tags'] and 'release' not in mv['release_tags'] and 'beta' not in mv['release_tags']:
+            for o in module['owners']:
+                if o == user_id:
+                    has_access = True
         if not has_access:
             if cc.is_admin(user_id)==1:
                 has_access = True
 
         if not has_access:
-            raise ValueError('Only module owners and catalog admins can view service logs.')
-
-        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
-        if 'dynamic_service' not in mv:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        if mv['dynamic_service'] != 1:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+            raise ValueError('Only catalog admins can view service logs.  Module ' +
+                'owners can view logs for dev versions of modules only if they are not ' +
+                'in beta or released')
 
         rancher = gdapi.Client(url=self.RANCHER_URL,
                       access_key=self.RANCHER_ACCESS_KEY,
