@@ -691,9 +691,7 @@ class ServiceWizard:
         module = cc.get_module_info({'module_name' : service['module_name']})
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
 
-        if 'dynamic_service' not in mv:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        if mv['dynamic_service'] != 1:
+        if 'dynamic_service' not in mv or mv['dynamic_service'] != 1:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
         has_access = False
