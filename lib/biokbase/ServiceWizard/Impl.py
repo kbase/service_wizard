@@ -39,9 +39,9 @@ class ServiceWizard:
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     ######################################### noqa
-    VERSION = "0.3.0"
+    VERSION = "0.4.0"
     GIT_URL = "git@github.com:kbase/service_wizard"
-    GIT_COMMIT_HASH = "d9e80f76036c254a145c9fd9c1e055c79b252ccb"
+    GIT_COMMIT_HASH = "61f202e1c0586b5a4adc3df3e52a138cb07527a7"
 
     #BEGIN_CLASS_HEADER
 
