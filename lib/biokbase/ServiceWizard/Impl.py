@@ -41,7 +41,7 @@ class ServiceWizard:
     ######################################### noqa
     VERSION = "0.3.0"
     GIT_URL = "git@github.com:kbase/service_wizard"
-    GIT_COMMIT_HASH = "f4cbf069cc7a7d456392e0d50d4580bcd9a92690"
+    GIT_COMMIT_HASH = "d9e80f76036c254a145c9fd9c1e055c79b252ccb"
 
     #BEGIN_CLASS_HEADER
 
