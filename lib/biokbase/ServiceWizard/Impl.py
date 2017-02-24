@@ -33,16 +33,16 @@ class ServiceWizard:
     
     '''
 
-    ######## WARNING FOR GEVENT USERS #######
+    ######## WARNING FOR GEVENT USERS ####### noqa
     # Since asynchronous IO can lead to methods - even the same method -
     # interrupting each other, you must be *very* careful when using global
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
-    #########################################
+    ######################################### noqa
     VERSION = "0.3.0"
-    GIT_URL = "git@github.com:msneddon/service_wizard"
-    GIT_COMMIT_HASH = "944bb62889baf435df6e8d12f5dfa8744c54cbea"
-    
+    GIT_URL = "git@github.com:kbase/service_wizard"
+    GIT_COMMIT_HASH = "f4cbf069cc7a7d456392e0d50d4580bcd9a92690"
+
     #BEGIN_CLASS_HEADER
 
     RANCHER_COMPOSE_BIN = 'rancher-compose'
@@ -239,7 +239,7 @@ class ServiceWizard:
 
         #END_CONSTRUCTOR
         pass
-    
+
 
     def version(self, ctx):
         """
@@ -850,7 +850,6 @@ class ServiceWizard:
                              'sockets is not type list as required.')
         # return the results
         return [sockets]
-
     def status(self, ctx):
         #BEGIN_STATUS
         returnVal = {'state': "OK", 'message': "", 'version': self.VERSION, 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from wsgiref.simple_server import make_server
 import sys
 import json
@@ -12,16 +13,17 @@ from jsonrpcbase import ServerError as JSONServerError
 from os import environ
 from ConfigParser import ConfigParser
 from biokbase import log
-import biokbase.nexus
 import requests as _requests
 import random as _random
 import os
-import requests.packages.urllib3
+from biokbase.ServiceWizard.authclient import KBaseAuth as _KBaseAuth
 
 DEPLOY = 'KB_DEPLOYMENT_CONFIG'
 SERVICE = 'KB_SERVICE_NAME'
+AUTH = 'auth-server-url'
 
 # Note that the error fields do not match the 2.0 JSONRPC spec
+
 
 def get_config_file():
     return environ.get(DEPLOY, None)
@@ -43,7 +45,7 @@ def get_config():
 
 config = get_config()
 
-from biokbase.ServiceWizard.Impl import ServiceWizard
+from biokbase.ServiceWizard.Impl import ServiceWizard  # noqa @IgnorePep8
 impl_ServiceWizard = ServiceWizard(config)
 
 
@@ -107,7 +109,11 @@ class JSONRPCServiceCustom(JSONRPCService):
             # Exception was raised inside the method.
             newerr = JSONServerError()
             newerr.trace = traceback.format_exc()
-            newerr.data = e.message
+            if isinstance(e.message, basestring):
+                newerr.data = e.message
+            else:
+                # Some exceptions embed other exceptions as the message
+                newerr.data = repr(e.message)
             raise newerr
         return result
 
@@ -169,7 +175,7 @@ class JSONRPCServiceCustom(JSONRPCService):
 
     def _handle_request(self, ctx, request):
         """Handles given request and returns its response."""
-        if self.method_data[request['method']].has_key('types'): # @IgnorePep8
+        if self.method_data[request['method']].has_key('types'):  # noqa @IgnorePep8
             self._validate_params_types(request['method'], request['params'])
 
         result = self._call_method(ctx, request)
@@ -330,43 +336,40 @@ class Application(object):
         self.rpc_service.add(impl_ServiceWizard.version,
                              name='ServiceWizard.version',
                              types=[])
-        self.method_authentication['ServiceWizard.version'] = 'none'
+        self.method_authentication['ServiceWizard.version'] = 'none'  # noqa
         self.rpc_service.add(impl_ServiceWizard.start,
                              name='ServiceWizard.start',
                              types=[dict])
-        self.method_authentication['ServiceWizard.start'] = 'none'
+        self.method_authentication['ServiceWizard.start'] = 'none'  # noqa
         self.rpc_service.add(impl_ServiceWizard.stop,
                              name='ServiceWizard.stop',
                              types=[dict])
-        self.method_authentication['ServiceWizard.stop'] = 'none'
+        self.method_authentication['ServiceWizard.stop'] = 'none'  # noqa
         self.rpc_service.add(impl_ServiceWizard.list_service_status,
                              name='ServiceWizard.list_service_status',
                              types=[dict])
-        self.method_authentication['ServiceWizard.list_service_status'] = 'none'
+        self.method_authentication['ServiceWizard.list_service_status'] = 'none'  # noqa
         self.rpc_service.add(impl_ServiceWizard.get_service_status,
                              name='ServiceWizard.get_service_status',
                              types=[dict])
-        self.method_authentication['ServiceWizard.get_service_status'] = 'none'
+        self.method_authentication['ServiceWizard.get_service_status'] = 'none'  # noqa
         self.rpc_service.add(impl_ServiceWizard.get_service_status_without_restart,
                              name='ServiceWizard.get_service_status_without_restart',
                              types=[dict])
-        self.method_authentication['ServiceWizard.get_service_status_without_restart'] = 'none'
+        self.method_authentication['ServiceWizard.get_service_status_without_restart'] = 'none'  # noqa
         self.rpc_service.add(impl_ServiceWizard.get_service_log,
                              name='ServiceWizard.get_service_log',
                              types=[dict])
-        self.method_authentication['ServiceWizard.get_service_log'] = 'required'
+        self.method_authentication['ServiceWizard.get_service_log'] = 'required'  # noqa
         self.rpc_service.add(impl_ServiceWizard.get_service_log_web_socket,
                              name='ServiceWizard.get_service_log_web_socket',
                              types=[dict])
-        self.method_authentication['ServiceWizard.get_service_log_web_socket'] = 'required'
+        self.method_authentication['ServiceWizard.get_service_log_web_socket'] = 'required'  # noqa
         self.rpc_service.add(impl_ServiceWizard.status,
                              name='ServiceWizard.status',
                              types=[dict])
-        self.auth_client = biokbase.nexus.Client(
-            config={'server': 'nexus.api.globusonline.org',
-                    'verify_ssl': True,
-                    'client': None,
-                    'client_secret': None})
+        authurl = config.get(AUTH) if config else None
+        self.auth_client = _KBaseAuth(authurl)
 
     def __call__(self, environ, start_response):
         # Context object, equivalent to the perl impl CallContext
@@ -396,29 +399,36 @@ class Application(object):
             else:
                 ctx['module'], ctx['method'] = req['method'].split('.')
                 ctx['call_id'] = req['id']
-                ctx['rpc_context'] = {'call_stack': [{'time':self.now_in_utc(), 'method': req['method']}]}
-                prov_action = {'service': ctx['module'], 'method': ctx['method'], 
-                               'method_params': req['params']}
+                ctx['rpc_context'] = {
+                    'call_stack': [{'time': self.now_in_utc(),
+                                    'method': req['method']}
+                                   ]
+                }
+                prov_action = {'service': ctx['module'],
+                               'method': ctx['method'],
+                               'method_params': req['params']
+                               }
                 ctx['provenance'] = [prov_action]
                 try:
                     token = environ.get('HTTP_AUTHORIZATION')
                     # parse out the method being requested and check if it
                     # has an authentication requirement
                     method_name = req['method']
-                    auth_req = self.method_authentication.get(method_name,
-                                                              "none")
-                    if auth_req != "none":
+                    auth_req = self.method_authentication.get(
+                        method_name, 'none')
+                    if auth_req != 'none':
                         if token is None and auth_req == 'required':
                             err = JSONServerError()
-                            err.data = "Authentication required for " + \
-                                "ServiceWizard but no authentication header was passed"
+                            err.data = (
+                                'Authentication required for ' +
+                                'ServiceWizard ' +
+                                'but no authentication header was passed')
                             raise err
                         elif token is None and auth_req == 'optional':
                             pass
                         else:
                             try:
-                                user, _, _ = \
-                                    self.auth_client.validate_token(token)
+                                user = self.auth_client.get_user(token)
                                 ctx['user_id'] = user
                                 ctx['authenticated'] = 1
                                 ctx['token'] = token
@@ -443,7 +453,7 @@ class Application(object):
                            }
                     trace = jre.trace if hasattr(jre, 'trace') else None
                     rpc_result = self.process_error(err, ctx, req, trace)
-                except Exception, e:
+                except Exception:
                     err = {'error': {'code': 0,
                                      'name': 'Unexpected Server Error',
                                      'message': 'An unexpected server error ' +
@@ -453,10 +463,10 @@ class Application(object):
                     rpc_result = self.process_error(err, ctx, req,
                                                     traceback.format_exc())
 
-        # print 'The request method was %s\n' % environ['REQUEST_METHOD']
-        # print 'The environment dictionary is:\n%s\n' % pprint.pformat(environ) @IgnorePep8
-        # print 'The request body was: %s' % request_body
-        # print 'The result from the method call is:\n%s\n' % \
+        # print 'Request method was %s\n' % environ['REQUEST_METHOD']
+        # print 'Environment dictionary is:\n%s\n' % pprint.pformat(environ)
+        # print 'Request body was: %s' % request_body
+        # print 'Result from the method call is:\n%s\n' % \
         #    pprint.pformat(rpc_result)
 
         if rpc_result:
@@ -480,7 +490,8 @@ class Application(object):
             error['id'] = request['id']
         if 'version' in request:
             error['version'] = request['version']
-            if 'error' not in error['error'] or error['error']['error'] is None:
+            e = error['error'].get('error')
+            if not e:
                 error['error']['error'] = trace
         elif 'jsonrpc' in request:
             error['jsonrpc'] = request['jsonrpc']
@@ -491,11 +502,12 @@ class Application(object):
         return json.dumps(error)
 
     def now_in_utc(self):
-        # Taken from http://stackoverflow.com/questions/3401428/how-to-get-an-isoformat-datetime-string-including-the-default-timezone
+        # noqa Taken from http://stackoverflow.com/questions/3401428/how-to-get-an-isoformat-datetime-string-including-the-default-timezone @IgnorePep8
         dtnow = datetime.datetime.now()
         dtutcnow = datetime.datetime.utcnow()
         delta = dtnow - dtutcnow
-        hh,mm = divmod((delta.days * 24*60*60 + delta.seconds + 30) // 60, 60)
+        hh, mm = divmod((delta.days * 24 * 60 * 60 + delta.seconds + 30) // 60,
+                        60)
         return "%s%+02d:%02d" % (dtnow.isoformat(), hh, mm)
 
 application = Application()
@@ -524,9 +536,7 @@ try:
         print "Monkeypatching std libraries for async"
         from gevent import monkey
         monkey.patch_all()
-    uwsgi.applications = {
-        '': application
-        }
+    uwsgi.applications = {'': application}
 except ImportError:
     # Not available outside of wsgi, ignore
     pass
@@ -562,17 +572,18 @@ def stop_server():
     _proc.terminate()
     _proc = None
 
+
 def process_async_cli(input_file_path, output_file_path, token):
     exit_code = 0
-    with open(input_file_path) as data_file:    
+    with open(input_file_path) as data_file:
         req = json.load(data_file)
     if 'version' not in req:
         req['version'] = '1.1'
-    if 'id' not in req: 
+    if 'id' not in req:
         req['id'] = str(_random.random())[2:]
     ctx = MethodContext(application.userlog)
     if token:
-        user, _, _ = application.auth_client.validate_token(token)
+        user = application.auth_client.get_user(token)
         ctx['user_id'] = user
         ctx['authenticated'] = 1
         ctx['token'] = token
@@ -580,7 +591,7 @@ def process_async_cli(input_file_path, output_file_path, token):
         ctx['rpc_context'] = req['context']
     ctx['CLI'] = 1
     ctx['module'], ctx['method'] = req['method'].split('.')
-    prov_action = {'service': ctx['module'], 'method': ctx['method'], 
+    prov_action = {'service': ctx['module'], 'method': ctx['method'],
                    'method_params': req['params']}
     ctx['provenance'] = [prov_action]
     resp = None
@@ -594,8 +605,8 @@ def process_async_cli(input_file_path, output_file_path, token):
                           'name': jre.message,
                           'message': jre.data,
                           'error': trace}
-               }
-    except Exception, e:
+                }
+    except Exception:
         trace = traceback.format_exc()
         resp = {'id': req['id'],
                 'version': req['version'],
@@ -603,20 +614,20 @@ def process_async_cli(input_file_path, output_file_path, token):
                           'name': 'Unexpected Server Error',
                           'message': 'An unexpected server error occurred',
                           'error': trace}
-               }
+                }
     if 'error' in resp:
         exit_code = 500
     with open(output_file_path, "w") as f:
         f.write(json.dumps(resp, cls=JSONObjectEncoder))
     return exit_code
-    
+
 if __name__ == "__main__":
-    requests.packages.urllib3.disable_warnings()
-    if len(sys.argv) >= 3 and len(sys.argv) <= 4 and os.path.isfile(sys.argv[1]):
+    if (len(sys.argv) >= 3 and len(sys.argv) <= 4 and
+            os.path.isfile(sys.argv[1])):
         token = None
         if len(sys.argv) == 4:
             if os.path.isfile(sys.argv[3]):
-                with open(sys.argv[3]) as token_file: 
+                with open(sys.argv[3]) as token_file:
                     token = token_file.read()
             else:
                 token = sys.argv[3]
