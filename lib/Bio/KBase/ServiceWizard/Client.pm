@@ -145,9 +145,10 @@ Get the version of the deployed service wizard endpoint.
 							       "Invalid argument count for function version (received $n, expecting 0)");
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.version",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.version",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -256,9 +257,10 @@ errors, then the status of the running service is provided.
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.start",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.start",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -367,9 +369,10 @@ errors, then the status of the stopped service is provided.
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.stop",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.stop",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -476,9 +479,10 @@ ServiceStatus is a reference to a hash where the following keys are defined:
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.list_service_status",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.list_service_status",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -590,9 +594,10 @@ found or encountered errors on startup.
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.get_service_status",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.get_service_status",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -699,9 +704,10 @@ boolean is an int
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.get_service_status_without_restart",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.get_service_status_without_restart",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -798,9 +804,10 @@ ServiceLog is a reference to a hash where the following keys are defined:
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.get_service_log",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.get_service_log",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -897,9 +904,10 @@ returns connection info for a websocket connection to get realtime service logs
 	}
     }
 
-    my $result = $self->{client}->call($self->{url}, $self->{headers}, {
-	method => "ServiceWizard.get_service_log_web_socket",
-	params => \@args,
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+	    method => "ServiceWizard.get_service_log_web_socket",
+	    params => \@args,
     });
     if ($result) {
 	if ($result->is_error) {
@@ -920,6 +928,36 @@ returns connection info for a websocket connection to get realtime service logs
 }
  
   
+sub status
+{
+    my($self, @args) = @_;
+    if ((my $n = @args) != 0) {
+        Bio::KBase::Exceptions::ArgumentValidationError->throw(error =>
+                                   "Invalid argument count for function status (received $n, expecting 0)");
+    }
+    my $url = $self->{url};
+    my $result = $self->{client}->call($url, $self->{headers}, {
+        method => "ServiceWizard.status",
+        params => \@args,
+    });
+    if ($result) {
+        if ($result->is_error) {
+            Bio::KBase::Exceptions::JSONRPC->throw(error => $result->error_message,
+                           code => $result->content->{error}->{code},
+                           method_name => 'status',
+                           data => $result->content->{error}->{error} # JSON::RPC::ReturnObject only supports JSONRPC 1.1 or 1.O
+                          );
+        } else {
+            return wantarray ? @{$result->result} : $result->result->[0];
+        }
+    } else {
+        Bio::KBase::Exceptions::HTTP->throw(error => "Error invoking method status",
+                        status_line => $self->{client}->status_line,
+                        method_name => 'status',
+                       );
+    }
+}
+   
 
 sub version {
     my ($self) = @_;
