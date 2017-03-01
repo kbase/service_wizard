@@ -124,7 +124,9 @@ class ServiceWizard:
                     'us.kbase.module.git_commit_hash':module_version['git_commit_hash']
                 },
                 "environment" : {
-                    'KBASE_ENDPOINT' : self.KBASE_ENDPOINT
+                    'KBASE_ENDPOINT' : self.KBASE_ENDPOINT,
+                    'AUTH_SERVICE_URL': self.AUTH_SERVICE_URL,
+                    'AUTH_SERVICE_URL_ALLOW_INSECURE': self.AUTH_SERVICE_URL_ALLOW_INSECURE
                 }
             }
 
@@ -206,6 +208,14 @@ class ServiceWizard:
         if 'catalog-url' not in config:
             raise ValueError('"catalog-url" configuration variable not set"')
         self.CATALOG_URL = config['catalog-url']
+
+        if 'auth-service-url' not in config:
+            raise ValueError('"auth-service-url" configuration variable not set"')
+        self.AUTH_SERVICE_URL = config['auth-service-url']
+
+        if 'auth-service-url-allow-insecure' not in config:
+            raise ValueError('"auth-service-url-allow-insecure" configuration variable not set"')
+        self.AUTH_SERVICE_URL_ALLOW_INSECURE = config['auth-service-url-allow-insecure']
 
         if 'rancher-env-url' not in config:
             raise ValueError('"rancher-env-url" configuration variable not set"')
