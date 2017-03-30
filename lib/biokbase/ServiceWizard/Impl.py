@@ -122,20 +122,9 @@ class ServiceWizard:
                 'AUTH_SERVICE_URL': self.AUTH_SERVICE_URL,
                 'AUTH_SERVICE_URL_ALLOW_INSECURE': self.AUTH_SERVICE_URL_ALLOW_INSECURE
             }
-        param_map = {}
         for secure_param in secure_param_list:
             param_name = secure_param['param_name']
-            version_tag = secure_param.get('version_tag')
-            # If version_tag is defined and doesn't match any known version we skip it:
-            if version_tag and not (version_tag == mv['git_commit_hash'] or 
-                                    version_tag == mv['version'] or
-                                    version_tag in mv['release_tags']):
-                continue
-            # We may override previous param_name value if it had empty version_tag previously:
-            if param_name not in param_map or not param_map[param_name].get('version_tag'):
-                param_map[param_name] = secure_param
-        for param_name in param_map:
-            param_value = param_map[param_name]['param_value']
+            param_value = secure_param['param_value']
             environ_map['KBASE_SECURE_CONFIG_PARAM_' + param_name] = param_value
         
         docker_compose[service_name] = {
@@ -332,7 +321,7 @@ class ServiceWizard:
         if mv['dynamic_service'] != 1:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
-        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name']})
+        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
         # Construct the docker compose and rancher compose file
         docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list)
 
@@ -440,7 +429,7 @@ class ServiceWizard:
         if mv['dynamic_service'] != 1:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
         
-        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name']})
+        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
         docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list)
 
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
