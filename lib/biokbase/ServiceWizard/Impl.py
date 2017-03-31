@@ -254,7 +254,7 @@ class ServiceWizard:
             self.RANCHER_ACCESS_KEY = config['access-key']
             self.RANCHER_SECRET_KEY = config['secret-key']
 
-        if 'catalog-admin-token' not in config:
+        if 'catalog-admin-token' not in config or not config['catalog-admin-token']:
             raise ValueError('"catalog-admin-token" configuration variable not set')
         self.CATALOG_ADMIN_TOKEN = config['catalog-admin-token']
         #END_CONSTRUCTOR
