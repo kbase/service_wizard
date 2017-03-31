@@ -56,6 +56,7 @@ class ServiceWizard:
 
     SVC_HOSTNAME = ''
     NGINX_PORT = ''
+    CATALOG_ADMIN_TOKEN = ''
 
     # Given module information, generate a unique stack name for that version
     def get_stack_name(self, module_version):
@@ -253,6 +254,9 @@ class ServiceWizard:
             self.RANCHER_ACCESS_KEY = config['access-key']
             self.RANCHER_SECRET_KEY = config['secret-key']
 
+        if 'catalog-admin-token' not in config:
+            raise ValueError('"catalog-admin-token" configuration variable not set')
+        self.CATALOG_ADMIN_TOKEN = config['catalog-admin-token']
         #END_CONSTRUCTOR
         pass
 
@@ -314,7 +318,7 @@ class ServiceWizard:
         print('START REQUEST: ' + str(service))
 
         # First, lookup the module information from the catalog, make sure it is a service
-        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
         if 'dynamic_service' not in mv:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
@@ -422,7 +426,7 @@ class ServiceWizard:
         print('STOP REQUEST: ' + str(service))
 
         # lookup the module info from the catalog
-        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
         if 'dynamic_service' not in mv:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
