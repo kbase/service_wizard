@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #BEGIN_HEADER
 import os
 import time
@@ -32,16 +33,16 @@ class ServiceWizard:
     
     '''
 
-    ######## WARNING FOR GEVENT USERS #######
+    ######## WARNING FOR GEVENT USERS ####### noqa
     # Since asynchronous IO can lead to methods - even the same method -
     # interrupting each other, you must be *very* careful when using global
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
-    #########################################
-    VERSION = "0.3.0"
-    GIT_URL = "git@github.com:msneddon/service_wizard.git"
-    GIT_COMMIT_HASH = "7ce70ba16d70429ee6fea6cddd914abea4fb4dec"
-    
+    ######################################### noqa
+    VERSION = "0.4.0"
+    GIT_URL = "git@github.com:kbase/service_wizard"
+    GIT_COMMIT_HASH = "61f202e1c0586b5a4adc3df3e52a138cb07527a7"
+
     #BEGIN_CLASS_HEADER
 
     RANCHER_COMPOSE_BIN = 'rancher-compose'
@@ -55,6 +56,7 @@ class ServiceWizard:
 
     SVC_HOSTNAME = ''
     NGINX_PORT = ''
+    CATALOG_ADMIN_TOKEN = ''
 
     # Given module information, generate a unique stack name for that version
     def get_stack_name(self, module_version):
@@ -79,7 +81,7 @@ class ServiceWizard:
         return dns_service_name
 
     # Build the docker_compose and rancher_compose files
-    def create_compose_files(self, module_version):
+    def create_compose_files(self, module_version, secure_param_list):
         # in progress: pull the existing config from rancher and include in new config
         # 1) look up service name to get project/environment
         # 2) POST  {"serviceIds":[]} to /v1/projects/$projid/environments/$envid/?action=exportconfig
@@ -116,15 +118,23 @@ class ServiceWizard:
                 "image" : "rancher/dns-service",
                 "links" : [ service_name+':'+service_name ]
             }
+        environ_map = {
+                'KBASE_ENDPOINT' : self.KBASE_ENDPOINT,
+                'AUTH_SERVICE_URL': self.AUTH_SERVICE_URL,
+                'AUTH_SERVICE_URL_ALLOW_INSECURE': self.AUTH_SERVICE_URL_ALLOW_INSECURE
+            }
+        for secure_param in secure_param_list:
+            param_name = secure_param['param_name']
+            param_value = secure_param['param_value']
+            environ_map['KBASE_SECURE_CONFIG_PARAM_' + param_name] = param_value
+        
         docker_compose[service_name] = {
                 "image" : module_version['docker_img_name'],
                 "labels" : {
                     'us.kbase.module.version':module_version['version'],
                     'us.kbase.module.git_commit_hash':module_version['git_commit_hash']
                 },
-                "environment" : {
-                    'KBASE_ENDPOINT' : self.KBASE_ENDPOINT
-                }
+                "environment" : environ_map
             }
 
         rancher_compose[service_name] = {
@@ -206,6 +216,14 @@ class ServiceWizard:
             raise ValueError('"catalog-url" configuration variable not set"')
         self.CATALOG_URL = config['catalog-url']
 
+        if 'auth-service-url' not in config:
+            raise ValueError('"auth-service-url" configuration variable not set"')
+        self.AUTH_SERVICE_URL = config['auth-service-url']
+
+        if 'auth-service-url-allow-insecure' not in config:
+            raise ValueError('"auth-service-url-allow-insecure" configuration variable not set"')
+        self.AUTH_SERVICE_URL_ALLOW_INSECURE = config['auth-service-url-allow-insecure']
+
         if 'rancher-env-url' not in config:
             raise ValueError('"rancher-env-url" configuration variable not set"')
         self.RANCHER_URL = config['rancher-env-url']
@@ -236,9 +254,12 @@ class ServiceWizard:
             self.RANCHER_ACCESS_KEY = config['access-key']
             self.RANCHER_SECRET_KEY = config['secret-key']
 
+        if 'catalog-admin-token' not in config or not config['catalog-admin-token']:
+            raise ValueError('"catalog-admin-token" configuration variable not set')
+        self.CATALOG_ADMIN_TOKEN = config['catalog-admin-token']
         #END_CONSTRUCTOR
         pass
-    
+
 
     def version(self, ctx):
         """
@@ -297,15 +318,16 @@ class ServiceWizard:
         print('START REQUEST: ' + str(service))
 
         # First, lookup the module information from the catalog, make sure it is a service
-        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
         if 'dynamic_service' not in mv:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
         if mv['dynamic_service'] != 1:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
 
+        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
         # Construct the docker compose and rancher compose file
-        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv)
+        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list)
 
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
@@ -404,14 +426,15 @@ class ServiceWizard:
         print('STOP REQUEST: ' + str(service))
 
         # lookup the module info from the catalog
-        cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
         mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
         if 'dynamic_service' not in mv:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
         if mv['dynamic_service'] != 1:
             raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
         
-        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv)
+        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
+        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list)
 
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
         os.makedirs(ymlpath)
@@ -685,23 +708,27 @@ class ServiceWizard:
         service = params['service']
         user_id = ctx['user_id']
         cc = Catalog(self.CATALOG_URL, token=ctx['token'])
+
+        # get_module_info is needed to get us owners list
         module = cc.get_module_info({'module_name' : service['module_name']})
+        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
+
+        if 'dynamic_service' not in mv or mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
         has_access = False
-        for o in module['owners']:
-            if o == user_id:
-                has_access = True
+        if 'dev' in mv['release_tags'] and 'release' not in mv['release_tags'] and 'beta' not in mv['release_tags']:
+            for o in module['owners']:
+                if o == user_id:
+                    has_access = True
         if not has_access:
             if cc.is_admin(user_id)==1:
                 has_access = True
 
         if not has_access:
-            raise ValueError('Only module owners and catalog admins can view service logs.')
-
-        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
-        if 'dynamic_service' not in mv:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        if mv['dynamic_service'] != 1:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+            raise ValueError('Only catalog admins can view service logs.  Module ' +
+                'owners can view logs for dev versions of modules only if they are not ' +
+                'in beta or released')
 
         rancher = gdapi.Client(url=self.RANCHER_URL,
                       access_key=self.RANCHER_ACCESS_KEY,
@@ -845,7 +872,6 @@ class ServiceWizard:
                              'sockets is not type list as required.')
         # return the results
         return [sockets]
-
     def status(self, ctx):
         #BEGIN_STATUS
         returnVal = {'state': "OK", 'message': "", 'version': self.VERSION, 
