@@ -517,7 +517,8 @@ class ServiceWizard:
 
         # next get environment id (could be a config parameter in the future rather than looping over everything)
         result = []
-        slists = rancher.list_environment()
+        # not sure if this is supposed to pass False, or the string 'false'
+        slists = rancher.list_environment(system='false')
         if len(slists) == 0: return [] # I shouldn't return 
         for slist in slists:
           eid = slist['id']
