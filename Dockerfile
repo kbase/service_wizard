@@ -1,3 +1,4 @@
+FROM kbase/catalog:latest as catalog
 FROM kbase/sdkbase2:latest as build
 
 
@@ -18,7 +19,7 @@ ARG VCS_REF
 ARG BRANCH=develop
 
 COPY --from=build /kb/deployment/ /kb/deployment/
-COPY --from=kbase/catalog:latest /kb/deployment/lib /kb/deployment/lib/
+COPY --from=catalog /kb/deployment/lib /kb/deployment/lib/
 
 ENV KB_DEPLOYMENT_CONFIG /kb/deployment/conf/deployment.cfg
 
