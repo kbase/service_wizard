@@ -1,5 +1,6 @@
 [ServiceWizard]
 kbase-endpoint = {{ default .Env.kbase_endpoint "https://ci.kbase.us/services" }}
+auth-service-url= {{ default .Env.auth_service_url "https://ci.kbase.us/services/auth/api/legacy/KBase/Sessions/Login" }}
 job-service-url = {{ default .Env.job_service_url "https://ci.kbase.us/services/ujs"}}
 workspace-url = {{ default .Env.workspace_url "https://ci.kbase.us/services/ws" }}
 shock-url = {{ default .Env.shock_url "https://ci.kbase.us/services/shock" }}
