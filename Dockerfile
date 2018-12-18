@@ -28,7 +28,7 @@ RUN rm -rf /kb/deployment/jettybase && \
     source activate root && \
     conda install -c anaconda semantic_version && \
     conda install -c conda-forge websocket-client && \
-    pip install gdapi && \
+    pip install gdapi-python && \
     ln -s /usr/lib/python2.7/plat-*/_sysconfigdata_nd.py /usr/lib/python2.7/
 
 # The BUILD_DATE value seem to bust the docker cache when the timestamp changes, move to
