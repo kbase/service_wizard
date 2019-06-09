@@ -256,7 +256,7 @@ class ServiceWizard:
 
         if ('access-key' not in config) or ('secret-key' not in config):
             self.USE_RANCHER_ACCESS_KEY = False
-            print('WARNING: No "access-key" and "secret-key" set for Rancher.  Will connect unauthenticated, which should only be used in test environments.')
+            print('WARNING: No "access-key" and "secret-key" set for gdapi.  Will connect unauthenticated, which should only be used in test environments.')
         else:
             self.RANCHER_ACCESS_KEY = config['access-key']
             self.RANCHER_SECRET_KEY = config['secret-key']

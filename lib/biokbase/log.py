@@ -67,14 +67,20 @@ METHODS
 """
 
 import json as _json
-import urllib.request as _urllib2
+try:
+    import urllib3.request as _urllib2
+except:
+    import urllib.request as _urllib2
 import syslog as _syslog
 import platform as _platform
 import inspect as _inspect
 import os as _os
 import getpass as _getpass
 import warnings as _warnings
-from configparser import ConfigParser as _ConfigParser
+try:
+    from ConfigParser import ConfigParser as _ConfigParser
+except:
+    from configparser import ConfigParser as _ConfigParser
 import time
 
 MLOG_ENV_FILE = 'MLOG_CONFIG_FILE'

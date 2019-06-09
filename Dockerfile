@@ -1,4 +1,4 @@
-FROM python:3.7-slim
+FROM python:2.7-slim
 
 # These ARGs values are passed in via the docker build command
 ARG BUILD_DATE
