@@ -9,9 +9,15 @@ import traceback
 import gdapi
 import json
 import zipfile
-from StringIO import StringIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 import re
-from urlparse import urlparse
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 
 from websocket import create_connection
 
@@ -20,7 +26,7 @@ import hashlib
 
 import requests
 
-from biokbase.catalog.Client import Catalog
+from clients.CatalogClient import Catalog
 #END_HEADER
 
 
@@ -39,9 +45,9 @@ class ServiceWizard:
     # state. A method could easily clobber the state set by another while
     # the latter method is running.
     ######################################### noqa
-    VERSION = "0.4.0"
-    GIT_URL = "git@github.com:kbase/service_wizard"
-    GIT_COMMIT_HASH = "61f202e1c0586b5a4adc3df3e52a138cb07527a7"
+    VERSION = "0.4.1"
+    GIT_URL = "https://github.com/kbase/service_wizard"
+    GIT_COMMIT_HASH = "6030930fe0186d2701038bb294aeab6a7cda0fff"
 
     #BEGIN_CLASS_HEADER
 
@@ -131,6 +137,7 @@ class ServiceWizard:
         docker_compose[service_name] = {
                 "image" : module_version['docker_img_name'],
                 "labels" : {
+                    'us.kbase.dynamicservice':"True",
                     'us.kbase.module.version':module_version['version'],
                     'us.kbase.module.git_commit_hash':module_version['git_commit_hash']
                 },
@@ -273,9 +280,9 @@ class ServiceWizard:
         #END version
 
         # At some point might do deeper type checking...
-        if not isinstance(version, basestring):
+        if not isinstance(version, str):
             raise ValueError('Method version return value ' +
-                             'version is not type basestring as required.')
+                             'version is not type str as required.')
         # return the results
         return [version]
 

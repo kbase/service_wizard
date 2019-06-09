@@ -29,11 +29,6 @@ compile:
 	mkdir -p $(LBIN_DIR)
 	kb-sdk compile $(SPEC_FILE) \
 		--out $(LIB_DIR) \
-		--plclname Bio::KBase::$(SERVICE_CAPS)::Client \
-		--jsclname javascript/Client \
-		--pyclname biokbase.$(SERVICE_CAPS).Client \
-		--javasrc src \
-		--java \
 		--pysrvname biokbase.$(SERVICE_CAPS).Server \
 		--pyimplname biokbase.$(SERVICE_CAPS).Impl;
 	touch $(LIB_DIR)/biokbase/__init__.py
