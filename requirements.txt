@@ -1,0 +1,8 @@
+semantic_version
+websocket-client
+pyyaml
+jsonrpcbase
+gunicorn
+uwsgi
+gdapi-python
+urllib3
