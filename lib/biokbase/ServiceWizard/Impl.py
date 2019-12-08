@@ -87,7 +87,7 @@ class ServiceWizard:
         return dns_service_name
 
     # Build the docker_compose and rancher_compose files
-    def create_compose_files(self, module_version, secure_param_list):
+    def create_compose_files(self, module_version, secure_param_list, volume_mounts):
         # in progress: pull the existing config from rancher and include in new config
         # 1) look up service name to get project/environment
         # 2) POST  {"serviceIds":[]} to /v1/projects/$projid/environments/$envid/?action=exportconfig
@@ -133,6 +133,7 @@ class ServiceWizard:
             param_name = secure_param['param_name']
             param_value = secure_param['param_value']
             environ_map['KBASE_SECURE_CONFIG_PARAM_' + param_name] = param_value
+
         
         docker_compose[service_name] = {
                 "image" : module_version['docker_img_name'],
@@ -144,17 +145,60 @@ class ServiceWizard:
                 "environment" : environ_map
             }
 
+        if len(volume_mounts) > 0:
+            mounts = []
+            for vol in volume_mounts:
+                if vol['read_only']>0:
+                    mounts.append('%s:%s:ro' % (vol['host_dir'], vol['container_dir']))
+                else:
+                    mounts.append('%s:%s' % (vol['host_dir'], vol['container_dir']))
+            docker_compose[service_name]['volumes'] = mounts
+
         rancher_compose[service_name] = {
                 "scale" : 1
             }
 
         return docker_compose, rancher_compose, is_new_stack
 
+    def create_stack(self, service):
+        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
+        param = {
+            'module_name' : service['module_name'],
+            'version' : service['version']
+        }
+        mv = cc.get_module_version(param)
+        if 'dynamic_service' not in mv:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+        if mv['dynamic_service'] != 1:
+            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
+
+        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
+        # Construct the docker compose and rancher compose file
+        param['client_group'] = 'service'
+        param['function_name'] = 'service'
+
+        mounts = cc.list_volume_mounts(param)[0]['volume_mounts']
+        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list, mounts)
+
+        # To do: try to use API to send docker-compose directly instead of needing to write to disk
+        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
+        os.makedirs(ymlpath)
+        docker_compose_path=ymlpath + '/docker-compose.yml'
+        rancher_compose_path=ymlpath + '/rancher-compose.yml'
+
+        with open(docker_compose_path, 'w') as outfile:
+            outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
+        # can be extended later
+        with open(rancher_compose_path, 'w') as outfile:
+            outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
+
+        return mv, is_new_stack, ymlpath
+
+
     def set_stack_description(self, module_version):
         pprint('setting stack description')
         rancher = gdapi.Client(url=self.RANCHER_URL,access_key=self.RANCHER_ACCESS_KEY,secret_key=self.RANCHER_SECRET_KEY)
         stacks = rancher.list_environment(name=self.get_stack_name(module_version))
-        pprint(len(stacks))
         pprint(module_version)
         if (len(stacks) > 0):
             exportConfigURL=stacks[0]['actions']['update']
@@ -323,31 +367,9 @@ class ServiceWizard:
         #BEGIN start
 
         print('START REQUEST: ' + str(service))
+        mv, is_new_stack, ymlpath = self.create_stack(service)
 
         # First, lookup the module information from the catalog, make sure it is a service
-        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
-        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
-        if 'dynamic_service' not in mv:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        if mv['dynamic_service'] != 1:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-
-        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
-        # Construct the docker compose and rancher compose file
-        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list)
-
-        # To do: try to use API to send docker-compose directly instead of needing to write to disk
-        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
-        os.makedirs(ymlpath)
-        docker_compose_path=ymlpath + '/docker-compose.yml'
-        rancher_compose_path=ymlpath + '/rancher-compose.yml'
-
-        with open(docker_compose_path, 'w') as outfile:
-            outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
-        # can be extended later
-        with open(rancher_compose_path, 'w') as outfile:
-            outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
-
         # setup Rancher creds and options
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.RANCHER_URL
@@ -431,27 +453,7 @@ class ServiceWizard:
         # return variables are: status
         #BEGIN stop
         print('STOP REQUEST: ' + str(service))
-
-        # lookup the module info from the catalog
-        cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
-        mv = cc.get_module_version({'module_name' : service['module_name'], 'version' : service['version']})
-        if 'dynamic_service' not in mv:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        if mv['dynamic_service'] != 1:
-            raise ValueError('Specified module is not marked as a dynamic service. ('+mv['module_name']+'-' + mv['git_commit_hash']+')')
-        
-        secure_param_list = cc.get_secure_config_params({'module_name' : mv['module_name'], 'version': mv['git_commit_hash']})
-        docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list)
-
-        ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
-        os.makedirs(ymlpath)
-        docker_compose_path=ymlpath + '/docker-compose.yml'
-        rancher_compose_path=ymlpath + '/rancher-compose.yml'
-
-        with open(docker_compose_path, 'w') as outfile:
-            outfile.write( yaml.safe_dump(docker_compose, default_flow_style=False) )
-        with open(rancher_compose_path, 'w') as outfile:
-            outfile.write( yaml.safe_dump(rancher_compose, default_flow_style=False) )
+        mv, is_new_stack, ymlpath = self.create_stack(service)
 
         eenv = os.environ.copy()
         eenv['RANCHER_URL'] = self.RANCHER_URL
