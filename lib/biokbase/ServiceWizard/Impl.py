@@ -177,7 +177,10 @@ class ServiceWizard:
         param['client_group'] = 'service'
         param['function_name'] = 'service'
 
-        mounts = cc.list_volume_mounts(param)[0]['volume_mounts']
+        mounts = []
+        mounts_list = cc.list_volume_mounts(param)
+        if len(mounts_list) > 0:
+           mounts = mounts_list[0]['volume_mounts']
         docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list, mounts)
 
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
