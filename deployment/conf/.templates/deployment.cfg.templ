@@ -1,0 +1,19 @@
+[ServiceWizard]
+
+kbase-endpoint = {{ default .Env.kbase_endpoint "https://ci.kbase.us/services" }}
+
+auth-service-url = {{ default .Env.auth_service_url "https://ci.kbase.us/services/auth/api/legacy/KBase/Sessions/Login" }}
+auth-service-url-allow-insecure = {{ default .Env.auth_service_url_allow_insecure "false" }}
+svc-hostname = {{ default .Env.svc_hostname "ci.kbase.us" }}
+catalog-url = {{ default .Env.catalog_url "https://ci.kbase.us/services/catalog" }}
+catalog-admin-token = {{ default .Env.catalog_admin_token "" }}
+
+
+rancher-env-url = {{ default .Env.rancher_env_url "" }}
+rancher-compose-bin = {{ default .Env.rancher_compose_bin "/usr/bin/rancher-compose"  }}
+access-key = {{ default .Env.access_key "" }}
+secret-key = {{ default .Env.secret_key "" }}
+
+nginx-port = {{ default .Env.nginx_port "443" }}
+
+temp-dir = {{ default .Env.temp_dir "/tmp" }} 
