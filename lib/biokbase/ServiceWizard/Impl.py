@@ -28,6 +28,7 @@ import requests
 
 from clients.CatalogClient import Catalog
 #END_HEADER
+from biokbase.ServiceWizard.ServiceManager import start_service
 
 
 class ServiceWizard:
@@ -47,7 +48,7 @@ class ServiceWizard:
     ######################################### noqa
     VERSION = "0.4.2"
     GIT_URL = "https://github.com/kbase/service_wizard"
-    GIT_COMMIT_HASH = "6030930fe0186d2701038bb294aeab6a7cda0fff"
+    GIT_COMMIT_HASH = "d1f7f1451816baf878357b47be1987c1645bcdb9"
 
     #BEGIN_CLASS_HEADER
 
@@ -120,6 +121,7 @@ class ServiceWizard:
         docker_compose = {}
         rancher_compose = {}
 
+        #TODO What are we using the rancher/dns-service for?
         docker_compose[dns_service_name] = {
                 "image" : "rancher/dns-service",
                 "links" : [ service_name+':'+service_name ]
@@ -161,6 +163,8 @@ class ServiceWizard:
         return docker_compose, rancher_compose, is_new_stack
 
     def create_stack(self, service):
+        #TODO Refactor this to no longer use rancher-compose
+
         cc = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
         param = {
             'module_name' : service['module_name'],
@@ -183,6 +187,7 @@ class ServiceWizard:
            mounts = mounts_list[0]['volume_mounts']
         docker_compose, rancher_compose, is_new_stack = self.create_compose_files(mv, secure_param_list, mounts)
 
+        #TODO: use rancher CLI  here
         # To do: try to use API to send docker-compose directly instead of needing to write to disk
         ymlpath = self.SCRATCH_DIR + '/' + mv['module_name'] + '/' + str(int(time.time()*1000))
         os.makedirs(ymlpath)
@@ -199,6 +204,8 @@ class ServiceWizard:
 
 
     def set_stack_description(self, module_version):
+        #TODO What would be the equivalent to a rancher2 stack? Or just add it to the dynamic services PROJECT
+        #It would be a namespace within the "Dynamic Services" Project
         pprint('setting stack description')
         rancher = gdapi.Client(url=self.RANCHER_URL,access_key=self.RANCHER_ACCESS_KEY,secret_key=self.RANCHER_SECRET_KEY)
         stacks = rancher.list_environment(name=self.get_stack_name(module_version))
@@ -260,6 +267,9 @@ class ServiceWizard:
         if 'svc-hostname' not in config:
             up = urlparse(config['rancher-env-url'])
             self.deploy_config['svc-hostname'] = up.hostname
+            #TODO might want to throw an exception here instead
+
+            
         if 'nginx-port' not in config:
             self.deploy_config['nginx-port'] = 443
 
@@ -311,6 +321,10 @@ class ServiceWizard:
         if 'catalog-admin-token' not in config or not config['catalog-admin-token']:
             raise ValueError('"catalog-admin-token" configuration variable not set')
         self.CATALOG_ADMIN_TOKEN = config['catalog-admin-token']
+
+        self.catalog_admin_client = Catalog(self.CATALOG_URL, token=self.CATALOG_ADMIN_TOKEN)
+        self.rancher_client = True
+
         #END_CONSTRUCTOR
         pass
 
@@ -332,6 +346,8 @@ class ServiceWizard:
                              'version is not type str as required.')
         # return the results
         return [version]
+
+
 
     def start(self, ctx, service):
         """
@@ -368,6 +384,11 @@ class ServiceWizard:
         # ctx is the context object
         # return variables are: status
         #BEGIN start
+
+        return start_service(start_service_params=service, catalog=self.catalog_admin_client,
+                             rancher_client=self.rancher_client)
+
+        # Is it just me or can anyone create a stack without any auth
 
         print('START REQUEST: ' + str(service))
         mv, is_new_stack, ymlpath = self.create_stack(service)
@@ -885,6 +906,7 @@ class ServiceWizard:
                              'sockets is not type list as required.')
         # return the results
         return [sockets]
+
     def status(self, ctx):
         #BEGIN_STATUS
         returnVal = {'state': "OK", 'message': "", 'version': self.VERSION, 

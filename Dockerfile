@@ -1,4 +1,4 @@
-FROM python:2.7-slim
+FROM python:3.9-slim-buster
 
 # These ARGs values are passed in via the docker build command
 ARG BUILD_DATE
@@ -17,10 +17,12 @@ RUN wget https://github.com/kbase/dockerize/raw/master/dockerize-linux-amd64-$DO
     tar -C /usr/bin -xvzf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && \
     rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
+
+#TODO Remove this?
 ADD ./deps/rancher-compose.sh /tmp/
 RUN sh /tmp/rancher-compose.sh
 
-RUN apt-get -y upgrade && apt-get install -y gcc
+RUN apt-get -y upgrade && apt-get install -y gcc git vim
 
 
 ADD requirements.txt /tmp/
@@ -29,9 +31,6 @@ RUN pip install -r /tmp/requirements.txt
 ADD . /kb/deployment/
 
 RUN mv /kb/deployment/deployment/conf/.templates /kb/deployment/conf/
-
-
-    # ln -s /usr/lib/python2.7/plat-*/_sysconfigdata_nd.py /usr/lib/python2.7/
 
 # The BUILD_DATE value seem to bust the docker cache when the timestamp changes, move to
 # the end
@@ -44,10 +43,4 @@ LABEL org.label-schema.build-date=$BUILD_DATE \
 
 ENV PYTHONPATH=/kb/deployment/lib
 WORKDIR /kb/deployment/
-
 ENTRYPOINT [ "/kb/deployment/entrypoint.sh"]
-# ENTRYPOINT [ "/usr/bin/dockerize" ]
-# CMD [ "-template", "/kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg", \
-#       "/kb/deployment/scripts/start_server.sh" ]
-
-
