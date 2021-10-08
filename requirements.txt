@@ -6,3 +6,5 @@ gunicorn
 uwsgi
 gdapi-python
 urllib3
+pytest
+client-python @ git+https://github.com/rancher/client-python.git@f617457722f95eded2a74b301ab08d79502a5c3f

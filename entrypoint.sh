@@ -15,6 +15,7 @@ dockerize \
   -validate-cert=false \
   -template /kb/deployment/conf/.templates/deployment.cfg.templ:/kb/deployment/conf/deployment.cfg
 
+#TODO Change to gunicorn?
 exec uwsgi --master \
   --processes ${PROCESSES:-5} \
   --threads ${THREADS:-5} \
